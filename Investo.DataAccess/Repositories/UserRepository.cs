@@ -47,4 +47,10 @@ public class UserRepository : AbstractRepository<User, Guid>, IUserRepository
         var entity = await this.dbSet.Include(u => u.UserType).FirstOrDefaultAsync(u => u.Id == id);
         return entity;
     }
+
+    public async Task<User?> GetByEmailAsync(string email)
+    {
+        var entity = await this.dbSet.Include(u => u.UserType).FirstOrDefaultAsync(u => u.Email == email);
+        return entity;
+    }
 }

@@ -7,6 +7,7 @@ using Investo.Api.Profiles;
 using Investo.BusinessLogic.Interfaces;
 using Investo.BusinessLogic.Services;
 using Microsoft.OpenApi.Models;
+using Investo.BusinessLogic.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -72,6 +73,9 @@ builder.Services.AddAuthorization();
 
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IJwtService, JwtService>();
+builder.Services.Configure<EmailSettings>(
+    builder.Configuration.GetSection("EmailSettings"));
+builder.Services.AddTransient<IEmailService, EmailService>();
 
 builder.Services.AddAutoMapper(typeof(MappingProfile));
 

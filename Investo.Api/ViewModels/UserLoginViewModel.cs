@@ -6,7 +6,9 @@ public class UserLoginViewModel
 {
     [Required]
     [EmailAddress]
-    public string Email { get; set; }
+    public string Email { get; set; } = string.Empty;
 
-    public string Password { get; set; }
+    [Required]
+    [RegularExpression(@"(?=.*[A-Z])(?=.*[a-z])(?=.*[0-9]).{8,32}")]
+    public string Password { get; set; } = string.Empty;
 }

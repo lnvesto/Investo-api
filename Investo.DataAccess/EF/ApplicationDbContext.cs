@@ -13,8 +13,13 @@ namespace Investo.DataAccess.EF
 
         public DbSet<UserType> UserTypes { get; set; }
 
+        public DbSet<UserResetPasswordCode> UserResetPasswordCodes { get; set; }
+
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
+            modelBuilder.Entity<User>()
+                .HasIndex(u => u.Email)
+                .IsUnique();
             base.OnModelCreating(modelBuilder);
             modelBuilder.Entity<UserType>().HasData(DataSeed.GetUserTypes());
         }

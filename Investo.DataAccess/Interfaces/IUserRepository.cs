@@ -11,4 +11,6 @@ public interface IUserRepository : ICrudRepository<User, Guid>
     Task<string?> SetRefreshToken(Guid userId, string refreshToken, DateTime expireDate);
 
     Task<string?> GetRefreshToken(Guid userId);
+
+    Task<User?> GetByEmailAsync(string email);
 }

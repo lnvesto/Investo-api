@@ -15,5 +15,8 @@ public class MappingProfile : Profile
         this.CreateMap<UserCreateViewModel, UserLoginModel>();
         this.CreateMap<User, UserModel>();
         this.CreateMap<UserUpdateViewModel, UserUpdateModel>();
+        this.CreateMap<UserResetPasswordCodeViewModel, UserResetPasswordCodeModel>();
+        this.CreateMap<UserResetPasswordCodeModel, UserResetPasswordCode>();
+        this.CreateMap<PasswordResetCodeViewModel, PasswordResetCodeModel>();
     }
 }

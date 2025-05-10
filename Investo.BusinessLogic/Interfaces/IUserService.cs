@@ -13,4 +13,10 @@ public interface IUserService
     Task<UserModel?> GetUserByIdAsync(Guid id);
 
     Task<bool> UpdateProfileAsync(Guid userId, UserUpdateModel user);
+
+    Task<string?> GetPasswordResetCodeAsync(UserResetPasswordCodeModel resetPassword);
+
+    Task<PasswordResetTokenModel?> VerifyPasswordResetCodeAsync(PasswordResetCodeModel code);
+
+    Task<bool> ResetPasswordAsync(string email, string _password);
 }

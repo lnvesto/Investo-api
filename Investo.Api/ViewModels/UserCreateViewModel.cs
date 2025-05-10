@@ -17,6 +17,7 @@ public class UserCreateViewModel
     public string Email { get; set; } = string.Empty;
 
     [Required]
+    [RegularExpression(@"(?=.*[A-Z])(?=.*[a-z])(?=.*[0-9]).{8,32}")]
     public string Password { get; set; } = string.Empty;
 
     [Required]

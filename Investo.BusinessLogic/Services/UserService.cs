@@ -17,12 +17,14 @@ public class UserService : IUserService
 {
     private readonly IJwtService jwtService;
     private readonly IUserRepository userRepository;
+    private readonly IUserPasswordResetCodeRepository userPasswordResetCodeRepository;
     private readonly IMapper mapper;
     private readonly IConfiguration configuration;
 
     public UserService(ApplicationDbContext context, IJwtService jwtService, IMapper mapper, IConfiguration configuration)
     {
         this.userRepository = new UserRepository(context);
+        this.userPasswordResetCodeRepository = new UserPasswordResetCodeRepository(context);
         this.jwtService = jwtService;
         this.mapper = mapper;
         this.configuration = configuration;
@@ -37,7 +39,7 @@ public class UserService : IUserService
         }
 
         byte[] password = Encoding.UTF8.GetBytes(userLoginModel.Password);
-        string hashedPassword = this.GenerateHash(password, Convert.FromBase64String(passwordSalt));
+        string hashedPassword = GenerateHash(password, Convert.FromBase64String(passwordSalt));
 
         var userEntity = await this.userRepository.LoginAsync(userLoginModel.Email, hashedPassword);
         if (userEntity is null)
@@ -53,6 +55,8 @@ public class UserService : IUserService
             return null;
         }
 
+        await this.userPasswordResetCodeRepository.DeleteAllByUserIdAsync(userEntity.Id);
+
         return new UserTokenDataModel
         {
             Token = token,
@@ -62,18 +66,19 @@ public class UserService : IUserService
 
     public async Task<Guid?> RegisterUserAsync(UserCreateModel userCreateModel)
     {
-        byte[] salt = RandomNumberGenerator.GetBytes(32);
-        byte[] password = Encoding.UTF8.GetBytes(userCreateModel.Password);
-
-        string hashPassword = this.GenerateHash(password, salt);
-        string saltString = Convert.ToBase64String(salt);
-
-        User? userEntity = this.mapper.Map<User>(userCreateModel);
-
-        if (userEntity is null)
+        var existingEntity = await this.userRepository.GetByEmailAsync(userCreateModel.Email);
+        if (existingEntity is not null)
         {
             return null;
         }
+
+        byte[] salt = RandomNumberGenerator.GetBytes(32);
+        byte[] password = Encoding.UTF8.GetBytes(userCreateModel.Password);
+
+        string hashPassword = GenerateHash(password, salt);
+        string saltString = Convert.ToBase64String(salt);
+
+        User? userEntity = this.mapper.Map<User>(userCreateModel);
 
         userEntity.PasswordHash = hashPassword;
         userEntity.PasswordSalt = saltString;
@@ -149,17 +154,89 @@ public class UserService : IUserService
         return true;
     }
 
+    public async Task<string?> GetPasswordResetCodeAsync(UserResetPasswordCodeModel resetPassword)
+    {
+        var userEntity = await this.userRepository.GetByEmailAsync(resetPassword.Email);
+        if (userEntity is null)
+        {
+            return null;
+        }
+
+        resetPassword.UserId = userEntity.Id;
+        resetPassword.ResetCode = GenerateResetCode();
+        resetPassword.ExpirationDate = DateTime.UtcNow.AddMinutes(int.Parse(this.configuration["ResetCode:ExpirationMinutes"] ?? "10"));
+
+        await this.userPasswordResetCodeRepository.CreateAsync(this.mapper.Map<UserResetPasswordCode>(resetPassword));
+
+        return resetPassword.ResetCode;
+    }
+
+    public async Task<PasswordResetTokenModel?> VerifyPasswordResetCodeAsync(PasswordResetCodeModel code)
+    {
+        var userEntity = await this.userRepository.GetByEmailAsync(code.Email);
+        if (userEntity is null)
+        {
+            return null;
+        }
+
+        var resetCodeEntity = await this.userPasswordResetCodeRepository.GetByUserIdAsync(userEntity.Id);
+        if (resetCodeEntity is null || resetCodeEntity.ResetCode != code.ResetCode)
+        {
+            return null;
+        }
+
+        if (resetCodeEntity.ExpirationDate < DateTime.UtcNow)
+        {
+            return null;
+        }
+
+        string temporaryToken = this.jwtService.GenerateToken(code);
+        await this.userPasswordResetCodeRepository.DeleteAllByUserIdAsync(userEntity.Id);
+        return new PasswordResetTokenModel
+        {
+            TemporaryToken = temporaryToken,
+        };
+    }
+
+    public async Task<bool> ResetPasswordAsync(string email, string _password)
+    {
+        var userEntity = await this.userRepository.GetByEmailAsync(email);
+        if (userEntity is null)
+        {
+            return false;
+        }
+        byte[] salt = RandomNumberGenerator.GetBytes(32);
+        byte[] password = Encoding.UTF8.GetBytes(_password);
+
+        string hashPassword = GenerateHash(password, salt);
+        string saltString = Convert.ToBase64String(salt);
+
+        userEntity.PasswordHash = hashPassword;
+        userEntity.PasswordSalt = saltString;
+
+        await this.userRepository.UpdateAsync(userEntity);
+
+        return true;
+    }
+
     private async Task<string?> SetNewRefreshToken(Guid userId)
     {
         string refreshToken = this.jwtService.GenerateRefreshToken();
-        DateTime expireDate = DateTime.UtcNow.AddDays(int.Parse(this.configuration["JWT:RefreshTokenExpirationDays"] ?? "7"));
+        DateTime expireDate = DateTime.UtcNow.AddDays(int.Parse(this.configuration["Jwt:RefreshTokenExpirationDays"] ?? "7"));
 
         return (await this.userRepository.SetRefreshToken(userId, refreshToken, expireDate) is not null) ? refreshToken : null;
     }
 
-    private string GenerateHash(byte[] password, byte[] salt)
+    private static string GenerateHash(byte[] password, byte[] salt)
     {
         byte[] hash = SHA256.HashData(password.Concat(salt).ToArray());
         return Convert.ToBase64String(hash);
+    }
+
+    private static string GenerateResetCode()
+    {
+        byte[] bytes = RandomNumberGenerator.GetBytes(6);
+        int value = BitConverter.ToInt32(bytes, 0) & 0x7FFFFFFF;
+        return (value % 1_000_000).ToString("D6");
     }
 }

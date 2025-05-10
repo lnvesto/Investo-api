@@ -21,7 +21,7 @@ public class JwtService : IJwtService
 
     public string GenerateToken(UserModel userModel)
     {
-        var claimn = new[]
+        var claim = new[]
         {
             new Claim(ClaimTypes.NameIdentifier, userModel.Id.ToString()),
             new Claim(ClaimTypes.Role, Enum.GetName((UserTypes)userModel.UserTypeId)!),
@@ -30,14 +30,36 @@ public class JwtService : IJwtService
             new Claim("email", userModel.Email),
         };
 
-        var key = new SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(configuration["JWT:Key"]!));
+        var key = new SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(configuration["Jwt:Key"]!));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
         var token = new JwtSecurityToken(
-            issuer: configuration["JWT:Issuer"],
-            audience: configuration["JWT:Audience"],
-            claims: claimn,
-            expires: DateTime.UtcNow.AddMinutes(double.Parse(this.configuration["JWT:AccessTokenExpirationMinutes"]!)),
+            issuer: configuration["Jwt:Issuer"],
+            audience: configuration["Jwt:Audience"],
+            claims: claim,
+            expires: DateTime.UtcNow.AddMinutes(double.Parse(this.configuration["Jwt:AccessTokenExpirationMinutes"]!)),
+            signingCredentials: credentials
+        );
+
+        return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
+    public string GenerateToken(PasswordResetCodeModel codeModel)
+    {
+        var claim = new[]
+        {
+            new Claim(ClaimTypes.Email, codeModel.Email),
+            new Claim("scope", "password_reset"),
+        };
+
+        var key = new SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(configuration["Jwt:Key"]!));
+        var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+        var token = new JwtSecurityToken(
+            issuer: configuration["Jwt:Issuer"],
+            audience: configuration["Jwt:Audience"],
+            claims: claim,
+            expires: DateTime.UtcNow.AddMinutes(double.Parse(this.configuration["ResetCode:ExpirationMinutes"]!)),
             signingCredentials: credentials
         );
 
@@ -57,10 +79,10 @@ public class JwtService : IJwtService
             ValidateAudience = true,
             ValidateLifetime = false,
             ValidateIssuerSigningKey = true,
-            ValidIssuer = this.configuration["JWT:Issuer"],
-            ValidAudience = this.configuration["JWT:Audience"],
+            ValidIssuer = this.configuration["Jwt:Issuer"],
+            ValidAudience = this.configuration["Jwt:Audience"],
             IssuerSigningKey = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(this.configuration["JWT:Key"]!)
+                Encoding.UTF8.GetBytes(this.configuration["Jwt:Key"]!)
             ),
         };
 
